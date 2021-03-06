@@ -86,11 +86,6 @@ namespace influxdb_cpp {
         detail::inner::url_encode(qs, query);
         return detail::inner::http_request("GET", "query", qs, "", si, &resp);
     }
-    inline int create_db(std::string& resp, const std::string& db_name, const server_info& si) {
-        std::string qs("&q=create+database+");
-        detail::inner::url_encode(qs, db_name);
-        return detail::inner::http_request("POST", "query", qs, "", si, &resp);
-    }
 
     struct builder {
         detail::tag_caller& meas(const std::string& m) {
@@ -150,23 +145,6 @@ namespace influxdb_cpp {
         int _post_http(const server_info& si, std::string* resp) {
             return detail::inner::http_request("POST", "write", "", lines_.str(), si, resp);
         }
-        int _send_udp(const std::string& host, int port) {
-            int sock, ret = 0;
-            struct sockaddr_in addr;
-
-            addr.sin_family = AF_INET;
-            addr.sin_port = htons(port);
-            if((addr.sin_addr.s_addr = inet_addr(host.c_str())) == INADDR_NONE) return -1;
-
-            if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) return -2;
-
-            lines_ << '\n';
-            if(sendto(sock, &lines_.str()[0], lines_.str().length(), 0, (struct sockaddr *)&addr, sizeof(addr)) < (int)lines_.str().length())
-                ret = -3;
-
-            closesocket(sock);
-            return ret;
-        }
         void _escape(const std::string& src, const char* escape_seq) {
             size_t pos = 0, start = 0;
             while((pos = src.find_first_of(escape_seq, start)) != std::string::npos) {
@@ -196,7 +174,6 @@ namespace influxdb_cpp {
         struct ts_caller : public builder {
             detail::tag_caller& meas(const std::string& m)                            { lines_ << '\n'; return _m(m); }
             int post_http(const server_info& si, std::string* resp = NULL)            { return _post_http(si, resp); }
-            int send_udp(const std::string& host, int port)                           { return _send_udp(host, port); }
         };
         struct field_caller : public ts_caller {
             detail::field_caller& field(const std::string& k, const std::string& v)   { return _f_s(',', k, v); }
