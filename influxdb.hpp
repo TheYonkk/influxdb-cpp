@@ -15,6 +15,11 @@
 #include <cstdio>
 #include <cstdlib>
 
+// for testing
+#include <iostream>
+
+#define DEFAULT_PRECISION 5
+
 #ifdef _WIN32
     #define NOMINMAX
     #include <windows.h>
@@ -40,14 +45,14 @@ namespace influxdb_cpp {
     struct server_info {
         std::string host_;
         int port_;
-        std::string db_;
-        std::string usr_;
-        std::string pwd_;
-        server_info(const std::string& host, int port, const std::string& db = "", const std::string& usr = "", const std::string& pwd = "") {
+        std::string org_;
+        std::string bkt_;
+        std::string tkn_;
+        server_info(const std::string& host, int port, const std::string& org, const std::string& token, const std::string& bucket = "") {
             port_ = port;
-            db_   = db;
-            usr_  = usr;
-            pwd_  = pwd;  
+            org_  = org;
+            tkn_  = token;
+            bkt_  = bucket;  
 
             //convert hostname to ip-address
             hostent * record = gethostbyname(host.c_str());
@@ -106,7 +111,9 @@ namespace influxdb_cpp {
             return (detail::tag_caller&)*this;
         }
         detail::field_caller& _f_s(char delim, const std::string& k, const std::string& v) {
+            std::cout << "KV: " << k << " " << v << std::endl;
             lines_ << delim;
+            lines_ << std::fixed;
             _escape(k, ",= ");
             lines_ << "=\"";
             _escape(v, "\"");
@@ -115,6 +122,7 @@ namespace influxdb_cpp {
         }
         detail::field_caller& _f_i(char delim, const std::string& k, long long v) {
             lines_ << delim;
+            lines_ << std::fixed;
             _escape(k, ",= ");
             lines_ << '=';
             lines_ << v << 'i';
@@ -123,6 +131,7 @@ namespace influxdb_cpp {
         detail::field_caller& _f_f(char delim, const std::string& k, double v, int prec) {
             lines_ << delim;
             _escape(k, ",= ");
+            lines_ << std::fixed;
             lines_.precision(prec);
             lines_ << '=' << v;
             return (detail::field_caller&)*this;
@@ -130,6 +139,7 @@ namespace influxdb_cpp {
         detail::field_caller& _f_b(char delim, const std::string& k, bool v) {
             lines_ << delim;
             _escape(k, ",= ");
+            lines_ << std::fixed;
             lines_ << '=' << (v ? 't' : 'f');
             return (detail::field_caller&)*this;
         }
@@ -179,7 +189,7 @@ namespace influxdb_cpp {
             detail::field_caller& field(const std::string& k, int v)                  { return _f_i(' ', k, v); }
             detail::field_caller& field(const std::string& k, long v)                 { return _f_i(' ', k, v); }
             detail::field_caller& field(const std::string& k, long long v)            { return _f_i(' ', k, v); }
-            detail::field_caller& field(const std::string& k, double v, int prec = 2) { return _f_f(' ', k, v, prec); }
+            detail::field_caller& field(const std::string& k, double v, int prec = DEFAULT_PRECISION) { return _f_f(' ', k, v, prec); }
         private:
             detail::tag_caller& meas(const std::string& m);
         };
@@ -238,9 +248,14 @@ namespace influxdb_cpp {
 
             for(;;) {
                 iv[0].iov_len = snprintf(&header[0], len,
-                    "%s /%s?db=%s&u=%s&p=%s%s HTTP/1.1\r\nHost: %s\r\nContent-Length: %d\r\n\r\n",
-                    method, uri, si.db_.c_str(), si.usr_.c_str(), si.pwd_.c_str(),
-                    querystring.c_str(), si.host_.c_str(), (int)body.length());
+                    "%s /api/v2/%s?org=%s&bucket=%s%s HTTP/1.1\r\nHost: %s\r\nAuthorization:Token %s\r\nContent-Length: %d\r\n\r\n",
+                    method, uri, si.org_.c_str(), si.bkt_.c_str(),
+                    querystring.c_str(), si.host_.c_str(), si.tkn_.c_str(), (int)body.length());
+
+                    std::cout << printf(&header[0], len,
+                    "%s /api/v2/%s?org=%s&bucket=%s%s HTTP/1.1\r\nHost: %s\r\nAuthorization:Token %s\r\nContent-Length: %d\r\n\r\n",
+                    method, uri, si.org_.c_str(), si.bkt_.c_str(),
+                    querystring.c_str(), si.host_.c_str(), si.tkn_.c_str(), (int)body.length()) << std::endl;
                 if((int)iv[0].iov_len >= len)
                     header.resize(len *= 2);
                 else
@@ -249,6 +264,7 @@ namespace influxdb_cpp {
             iv[0].iov_base = &header[0];
             iv[1].iov_base = (void*)&body[0];
             iv[1].iov_len = body.length();
+            std::cout << body << std::endl;
 
             if(writev(sock, iv, 2) < (int)(iv[0].iov_len + iv[1].iov_len)) {
                 ret_code = -6;
