@@ -5,7 +5,7 @@ A header-only C++ query & write client for InfluxDB.
 [![license](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)](https://github.com/orca-zhang/influxdb-cpp/blob/master/LICENSE)  [![Build Status](https://semaphoreci.com/api/v1/orca-zhang-91/influxdb-cpp/branches/master/shields_badge.svg)](https://semaphoreci.com/orca-zhang-91/influxdb-cpp)  [![Build status](https://ci.appveyor.com/api/projects/status/gusrrn0mn67q2yaj?svg=true)](https://ci.appveyor.com/project/orca-zhang/influxdb-cpp)
 
 - Support versions:
-  - InfluxDB v0.9 ~ 1.7
+  - InfluxDB v2.0
   - Check yourself while using other versions.
 
 ### Why use influxdb-cpp?
@@ -38,16 +38,16 @@ A header-only C++ query & write client for InfluxDB.
     ```
 
 
-- You can rapidly start writing serires by according to the following example.
+- You can rapidly start writing series according to the following example.
 
     ```cpp
-    influxdb_cpp::server_info si("127.0.0.1", 8086, "db", "usr", "pwd");
+    influxdb_cpp::server_info si("127.0.0.1", 8086, "org", "token", "bucket");
     influxdb_cpp::builder()
         .meas("foo")
         .tag("k", "v")
         .tag("x", "y")
         .field("x", 10)
-        .field("y", 10.3, 2)
+        .field("y", 10.3, 4)
         .field("z", 10.3456)
         .field("b", !!10)
         .timestamp(1512722735522840439)
@@ -55,23 +55,17 @@ A header-only C++ query & write client for InfluxDB.
     ```
 
   - **Remarks**: 
-    - 3rd parameter `precision` of `field()` is optional for floating point value, and default precision is `2`. 
-    - `usr` and `pwd` is optional for authorization.
+    - 3rd parameter `precision` of `field()` is optional for floating point value, and default precision is defined in the top of the header. 
+    - The token must have access to write (and/or read) from the specified organization and bucket.
+    - Although `bucket` is an optional parameter for a server info object, it is **required** for database writes.
+
 
 - The series sent is:
 
     ```
-    foo,k=v,x=y x=10i,y=10.30,z=10.35,b=t 1512722735522840439
+    foo,k=v,x=y x=10i,y=10.30,z=10.346,b=t 1512722735522840439
     ```
 
-- You could change `post_http` to `send_udp` for udp request. And only `host` and `port` is required for udp.
-
-    ```cpp
-    influxdb_cpp::builder()
-        .meas("foo")
-        .field("x", 10)
-        .send_udp("127.0.0.1", 8091);
-    ```
 
 - Bulk/batch/multiple insert also supports:
 
@@ -82,7 +76,7 @@ A header-only C++ query & write client for InfluxDB.
 
         .meas("bar")  // series 2
         .field("y", 10.3)
-        .send_udp("127.0.0.1", 8091);
+        .post_http(si);
     ```
 
 - The series sent are:
@@ -94,16 +88,19 @@ A header-only C++ query & write client for InfluxDB.
 
 #### Query example
 
-- And you can query series by according to the following example.
+- And you can query series using the Flux query language.
 
     ```cpp
-    influxdb_cpp::server_info si("127.0.0.1", 8086, "db", "usr", "pwd");
+    influxdb_cpp::server_info si("localhost", 8086, "spartans", "my_token", "");
 
     string resp;
-    influxdb_cpp::query(resp, "select * from t", si);
-    ```
+    string query("from(bucket: \\\"SR-20\\\")|> range(start: -5m)|>filter(fn: (r)=>r[\\\"_measurement\\\"] == \\\"cpu\\\")|>filter(fn: (r) => r[\\\"_field\\\"] == \\\"usage_user\\\")");
 
-- You can use [xpjson](https://github.com/ez8-co/xpjson) to parse the result refer to [issue #3](https://github.com/orca-zhang/influxdb-cpp/issues/3).
+    influxdb_cpp::query(resp, query, si);
+    ```
+- _**NOTE:**_ The query is sent in a JSON key-pair, therefore there must be no newlines/tabs, and `"` must be double-escaped as `\\\"`!
+
+- The results are returned in CSV format. A column, `table`, separates different measurements
 
 ### **Remarks for Windows**
 
