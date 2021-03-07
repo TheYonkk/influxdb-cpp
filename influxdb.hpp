@@ -81,10 +81,15 @@ namespace influxdb_cpp {
         };
     }
 
-    inline int query(std::string& resp, const std::string& query, const server_info& si) {
-        std::string qs("&q=");
-        detail::inner::url_encode(qs, query);
-        return detail::inner::http_request("GET", "query", qs, "", si, &resp);
+    inline int flux_query(std::string& resp, const std::string& query, const server_info& si) {
+
+        // query JSON body
+        std::stringstream body;
+        body << "{\"query\": \"";
+        body << query;
+        body << "\", \"type\": \"flux\" }";
+
+        return detail::inner::http_request("POST", "query", "", body.str(), si, &resp);
     }
 
     struct builder {
