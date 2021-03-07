@@ -48,7 +48,7 @@ namespace influxdb_cpp {
         std::string org_;
         std::string bkt_;
         std::string tkn_;
-        server_info(const std::string& host, int port, const std::string& org, const std::string& token, const std::string& bucket = "") {
+        server_info(const std::string& host, int port, const std::string& org, const std::string& token, const std::string& bucket) {
             port_ = port;
             org_  = org;
             tkn_  = token;
