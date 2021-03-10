@@ -1,6 +1,6 @@
-# influxdb-cpp
+# influxdb-cpp-2.0
 
-A header-only C++ query & write client for InfluxDB.
+A header-only C++ query & write client for InfluxDB 2.0.
 
 [![license](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)](https://github.com/orca-zhang/influxdb-cpp/blob/master/LICENSE)  [![Build Status](https://semaphoreci.com/api/v1/orca-zhang-91/influxdb-cpp/branches/master/shields_badge.svg)](https://semaphoreci.com/orca-zhang-91/influxdb-cpp)  [![Build status](https://ci.appveyor.com/api/projects/status/gusrrn0mn67q2yaj?svg=true)](https://ci.appveyor.com/project/orca-zhang/influxdb-cpp)
 
