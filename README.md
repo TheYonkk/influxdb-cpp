@@ -6,7 +6,8 @@ A header-only C++ query & write client for InfluxDB.
 
 - Support versions:
   - InfluxDB v2.0
-  - Check yourself while using other versions.
+  - Incompatible with versions 1.x
+  - Check yourself while using future versions.
 
 ### Why use influxdb-cpp?
 
