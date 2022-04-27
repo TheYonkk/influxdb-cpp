@@ -48,25 +48,47 @@ namespace influxdb_cpp {
         std::string org_;
         std::string bkt_;
         std::string tkn_;
+        struct addrinfo hints_, *res_=NULL;
         server_info(const std::string& host, int port, const std::string& org, const std::string& token, const std::string& bucket = "") {
             port_ = port;
             org_  = org;
             tkn_  = token;
-            bkt_  = bucket;  
+            bkt_  = bucket;
 
-            //convert hostname to ip-address
-            hostent * record = gethostbyname(host.c_str());
-            if(record == NULL)
-            {
-                printf("Cannot resolve IP address from hostname: %s is unavailable. Try to ping the host.\n", host.c_str());
-                std::exit(-1);
+            // please reference the IBM documentation for IPv4/IPv6 with questions
+            // https://www.ibm.com/docs/en/i/7.2?topic=clients-example-ipv4-ipv6-client
+            int resp = 0;
+
+            struct in6_addr serveraddr;
+            memset(&hints_, 0x00, sizeof(hints_));
+            hints_.ai_flags    = AI_NUMERICSERV;
+            hints_.ai_family   = AF_UNSPEC;
+            hints_.ai_socktype = SOCK_STREAM;
+
+            // check to see if the address is a valid IPv4 address
+            resp = inet_pton(AF_INET, host.c_str(), &serveraddr);
+            if (resp == 1){
+                hints_.ai_family = AF_INET; // IPv4
+                hints_.ai_flags |= AI_NUMERICHOST;
+            
+            // not a valid IPv4 -> check to see if address is a valid IPv6 address
+            } else {
+                resp = inet_pton(AF_INET6, host.c_str(), &serveraddr);
+                if (resp == 1) {
+                    hints_.ai_family = AF_INET6;  // IPv6
+                    hints_.ai_flags |= AI_NUMERICHOST;
+
+                }
             }
-            in_addr * address = (in_addr * )record->h_addr;
-            std::string ip_address = inet_ntoa(* address);
 
-            printf("Resolved IP address from hostname: %s.\n", ip_address.c_str());
+            resp = getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints_, &res_);
+            if (resp != 0) {
+                std::cerr << "Host not found --> " << gai_strerror(resp) << std::endl;
+                if (resp == EAI_SYSTEM)
+                    std::cerr << "getaddrinfo() failed" << std::endl;
+                exit(1);
+            }
 
-            host_ = ip_address;
         }
     };
     namespace detail {
@@ -209,22 +231,31 @@ namespace influxdb_cpp {
             const std::string& querystring, const std::string& body, const server_info& si, std::string* resp) {
             std::string header;
             struct iovec iv[2];
-            struct sockaddr_in addr;
             int sock, ret_code = 0, content_length = 0, len = 0;
             char ch;
             unsigned char chunked = 0;
 
-            addr.sin_family = AF_INET;
-            addr.sin_port = htons(si.port_);
 
-            if((addr.sin_addr.s_addr = inet_addr(si.host_.c_str())) == INADDR_NONE) return -1;
-
-            if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) return -2;
-
-            if(connect(sock, (struct sockaddr*)(&addr), sizeof(addr)) < 0) {
+            // open the socket
+            sock = socket(si.res_->ai_family, si.res_->ai_socktype, si.res_->ai_protocol);
+            if (sock < 0) {
+                std::cerr << "socket() failed" << std::endl;
                 closesocket(sock);
-                return -3;
+                return(1);
             }
+
+
+
+            // connect to the server
+            ret_code = connect(sock, si.res_->ai_addr, si.res_->ai_addrlen);
+            if (ret_code < 0)
+            {
+                std::cerr << "connect() failed" << std::endl;
+                closesocket(sock);
+                exit(1);
+            }
+
+
 
             header.resize(len = 0x100);
 
@@ -246,7 +277,6 @@ namespace influxdb_cpp {
             iv[0].iov_base = &header[0];
             iv[1].iov_base = (void*)&body[0];
             iv[1].iov_len = body.length();
-            std::cout << body << std::endl;
 
             if(writev(sock, iv, 2) < (int)(iv[0].iov_len + iv[1].iov_len)) {
                 ret_code = -6;
