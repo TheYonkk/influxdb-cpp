@@ -133,7 +133,9 @@ namespace influxdb_cpp {
             return (detail::tag_caller&)*this;
         }
         detail::field_caller& _f_s(char delim, const std::string& k, const std::string& v) {
+#ifdef INFLUXCPP2_DEBUG
             std::cout << "KV: " << k << " " << v << std::endl;
+#endif
             lines_ << delim;
             lines_ << std::fixed;
             _escape(k, ",= ");
@@ -265,10 +267,12 @@ namespace influxdb_cpp {
                     method, uri, si.org_.c_str(), si.bkt_.c_str(),
                     querystring.c_str(), si.host_.c_str(), si.tkn_.c_str(), (int)body.length());
 
+#ifdef INFLUXCPP2_DEBUG
                     std::cout << printf(&header[0], len,
                     "%s /api/v2/%s?org=%s&bucket=%s%s HTTP/1.1\r\nHost: %s\r\nAuthorization:Token %s\r\nContent-Length: %d\r\n\r\n",
                     method, uri, si.org_.c_str(), si.bkt_.c_str(),
                     querystring.c_str(), si.host_.c_str(), si.tkn_.c_str(), (int)body.length()) << std::endl;
+#endif
                 if((int)iv[0].iov_len >= len)
                     header.resize(len *= 2);
                 else
