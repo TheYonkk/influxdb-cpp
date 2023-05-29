@@ -44,12 +44,12 @@
 namespace influxdb_cpp {
     struct server_info {
         std::string host_;
-        int port_;
+        unsigned port_;
         std::string org_;
         std::string bkt_;
         std::string tkn_;
         struct addrinfo hints_, *res_=NULL;
-        server_info(const std::string& host, int port, const std::string& org, const std::string& token, const std::string& bucket = "") {
+        server_info(const std::string& host, unsigned port, const std::string& org, const std::string& token, const std::string& bucket = "") {
             port_ = port;
             org_  = org;
             tkn_  = token;
@@ -321,17 +321,20 @@ namespace influxdb_cpp {
                     case '\r':__('\n')
                         switch(chunked) {
                             do {__('\r')__('\n')
+                                [[fallthrough]];
                             case 1:
                                 _GET_CHUNKED_LEN(content_length, '\r')__('\n')
                                 if(!content_length) {
                                     __('\r')__('\n')
                                     goto END;
                                 }
+                                [[fallthrough]];
                             case 0:
                                 while(content_length > 0 && !_NO_MORE()) {
-                                    content_length -= (iv[1].iov_len = std::min(content_length, (int)iv[0].iov_len - len));
+                                    iv[1].iov_len = static_cast<size_t>(std::min(content_length, static_cast<int>(iv[0].iov_len) - len));
+                                    content_length -= static_cast<int>(iv[1].iov_len);
                                     if(resp) resp->append(&header[len], iv[1].iov_len);
-                                    len += iv[1].iov_len;
+                                    len += static_cast<int>(iv[1].iov_len);
                                 }
                             } while(chunked);
                         }
