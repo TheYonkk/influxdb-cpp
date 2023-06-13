@@ -44,12 +44,12 @@
 namespace influxdb_cpp {
     struct server_info {
         std::string host_;
-        int port_;
+        unsigned port_;
         std::string org_;
         std::string bkt_;
         std::string tkn_;
         struct addrinfo hints_, *res_=NULL;
-        server_info(const std::string& host, int port, const std::string& org, const std::string& token, const std::string& bucket = "") {
+        server_info(const std::string& host, unsigned port, const std::string& org, const std::string& token, const std::string& bucket = "") {
             port_ = port;
             org_  = org;
             tkn_  = token;
@@ -70,7 +70,7 @@ namespace influxdb_cpp {
             if (resp == 1){
                 hints_.ai_family = AF_INET; // IPv4
                 hints_.ai_flags |= AI_NUMERICHOST;
-            
+
             // not a valid IPv4 -> check to see if address is a valid IPv6 address
             } else {
                 resp = inet_pton(AF_INET6, host.c_str(), &serveraddr);
@@ -229,6 +229,7 @@ namespace influxdb_cpp {
             }
             out.append(src.c_str() + start, src.length() - start);
         }
+
         inline int inner::http_request(const char* method, const char* uri,
             const std::string& querystring, const std::string& body, const server_info& si, std::string* resp) {
             std::string header;
@@ -237,24 +238,26 @@ namespace influxdb_cpp {
             char ch;
             unsigned char chunked = 0;
 
+            if(resp) resp->clear();
 
             // open the socket
             sock = socket(si.res_->ai_family, si.res_->ai_socktype, si.res_->ai_protocol);
             if (sock < 0) {
-                std::cerr << "socket() failed" << std::endl;
+                std::string msg = "socket() failed";
+                if(resp) *resp = msg;
+                else std::cerr << msg << std::endl;
                 closesocket(sock);
-                return(1);
+                return 1;
             }
-
-
 
             // connect to the server
             ret_code = connect(sock, si.res_->ai_addr, si.res_->ai_addrlen);
-            if (ret_code < 0)
-            {
-                std::cerr << "connect() failed" << std::endl;
+            if (ret_code < 0) {
+                std::string msg = "connect() failed";
+                if(resp) *resp = msg;
+                else std::cerr << msg << std::endl;
                 closesocket(sock);
-                exit(1);
+                return 1;
             }
 
 
@@ -301,7 +304,6 @@ namespace influxdb_cpp {
 #define _(c) if((_GET_NEXT_CHAR()) != c) break;
 #define __(c) if((_GET_NEXT_CHAR()) != c) { ret_code = -9; goto END; }
 
-            if(resp) resp->clear();
 
             _UNTIL(' ')_GET_NUMBER(ret_code)
             for(;;) {
@@ -319,17 +321,20 @@ namespace influxdb_cpp {
                     case '\r':__('\n')
                         switch(chunked) {
                             do {__('\r')__('\n')
+                                [[fallthrough]];
                             case 1:
                                 _GET_CHUNKED_LEN(content_length, '\r')__('\n')
                                 if(!content_length) {
                                     __('\r')__('\n')
                                     goto END;
                                 }
+                                [[fallthrough]];
                             case 0:
                                 while(content_length > 0 && !_NO_MORE()) {
-                                    content_length -= (iv[1].iov_len = std::min(content_length, (int)iv[0].iov_len - len));
+                                    iv[1].iov_len = static_cast<size_t>(std::min(content_length, static_cast<int>(iv[0].iov_len) - len));
+                                    content_length -= static_cast<int>(iv[1].iov_len);
                                     if(resp) resp->append(&header[len], iv[1].iov_len);
-                                    len += iv[1].iov_len;
+                                    len += static_cast<int>(iv[1].iov_len);
                                 }
                             } while(chunked);
                         }
